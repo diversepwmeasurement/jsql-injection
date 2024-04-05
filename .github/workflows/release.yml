@@ -1,52 +1,53 @@
-on:
-  workflow_call:
-    
 jobs:
-
   draft-release:
-    name: Draft release
-    runs-on: ubuntu-latest
     environment: Production
+    name: Draft release
     outputs:
       release-id: ${{ steps.step-create-draft.outputs.release-id }}
+    runs-on: self-hosted
     steps:
-
-    - name: Checkout code
+    - continue-on-error: true
+      name: Checkout code
       uses: actions/checkout@v3
-
-    - name: Set up JDK
+    - continue-on-error: true
+      name: Set up JDK
       uses: actions/setup-java@v3
       with:
         distribution: temurin
         java-version: 18
-
-    - name: Set Maven dependencies cache
+    - continue-on-error: true
+      name: Set Maven dependencies cache
       uses: actions/cache@v3
       with:
-        path: ~/.m2/repository
         key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        path: ~/.m2/repository
         restore-keys: ${{ runner.os }}-maven-
-
-    - name: Create release draft
+    - continue-on-error: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       id: step-create-draft
+      name: Create release draft
       run: ./.github/workflows/scripts/create-draft-release.sh
-
   publish-release:
-    name: Publish release
-    runs-on: ubuntu-latest
     environment: Production
-    needs: [draft-release]
+    name: Publish release
+    needs:
+    - draft-release
+    runs-on: self-hosted
     steps:
+    - continue-on-error: true
+      name: Checkout code
+      uses: actions/checkout@v3
+    - continue-on-error: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RELEASE_ID: ${{ needs.draft-release.outputs.release-id }}
+      name: Approve release
+      run: '. ./.github/workflows/scripts/github-functions.sh
 
-      - name: Checkout code
-        uses: actions/checkout@v3
+        echo $(__approveAsset)
 
-      - name: Approve release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_ID: ${{ needs.draft-release.outputs.release-id }}
-        run: |
-          . ./.github/workflows/scripts/github-functions.sh
-          echo $(__approveAsset)
+        '
+on:
+  repository_dispatch:
+    types: trigger-ga___release.yml
